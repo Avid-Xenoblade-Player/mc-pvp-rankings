@@ -276,9 +276,9 @@ function openPlayerModal(playerName) {
   const overallWinRate = overall.games > 0 ? Math.round((overall.wins / overall.games) * 100) : 0;
 
   const modeLabels = [
-    { key: "sw", label: "☁️ SkyWars" },
-    { key: "bw", label: "🛏️ BedWars" },
-    { key: "arena", label: "⚔️ PvP Arena" }
+    { key: "sw", label: "SkyWars" },
+    { key: "bw", label: "BedWars" },
+    { key: "arena", label: "PvP Arena" }
   ];
 
   const modeCardsHtml = modeLabels.map(m => {

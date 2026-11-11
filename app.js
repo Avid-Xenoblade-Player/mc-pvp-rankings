@@ -104,21 +104,21 @@ function parseMatchString(str) {
   return results;
 }
 
-function computeMultiplayerElo(lobby, players, eloField) {
+function computeMultiplayerElo(lobby, players, modeKey) {
   const n = lobby.length;
   const deltas = {};
   const scaleFactor = CONFIG.K_FACTOR / (n - 1);
 
   lobby.forEach(playerA => {
     const keyA = playerA.name.toLowerCase();
-    const ratingA = players[keyA][eloField];
+    const ratingA = players[keyA].stats[modeKey].elo;
     let totalChange = 0;
 
     lobby.forEach(playerB => {
       const keyB = playerB.name.toLowerCase();
       if (keyA === keyB) return;
 
-      const ratingB = players[keyB][eloField];
+      const ratingB = players[keyB].stats[modeKey].elo;
       const expectedScore = 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
 
       let actualScore = 0.5;
@@ -148,6 +148,16 @@ function getTierBadge(elo) {
   return "LT5";
 }
 
+function createModeStats() {
+  return {
+    elo: CONFIG.STARTING_ELO,
+    wins: 0,
+    games: 0,
+    kills: 0,
+    streak: 0
+  };
+}
+
 function processMatches(rows) {
   const players = {};
   const history = [];
@@ -167,15 +177,11 @@ function processMatches(rows) {
       if (!players[key]) {
         players[key] = {
           name: p.name,
-          overall: CONFIG.STARTING_ELO,
-          sw: CONFIG.STARTING_ELO,
-          bw: CONFIG.STARTING_ELO,
-          wins: 0,
-          games: 0,
-          kills: 0,
-          streak: 0,
-          swStreak: 0,
-          bwStreak: 0
+          stats: {
+            overall: createModeStats(),
+            sw: createModeStats(),
+            bw: createModeStats()
+          }
         };
       }
     });
@@ -183,26 +189,28 @@ function processMatches(rows) {
     const overallDeltas = computeMultiplayerElo(lobby, players, "overall");
     const isBedwars = mode.toLowerCase().includes("bed");
     const modeKey = isBedwars ? "bw" : "sw";
-    const modeStreakKey = isBedwars ? "bwStreak" : "swStreak";
     const modeDeltas = computeMultiplayerElo(lobby, players, modeKey);
 
     lobby.forEach(p => {
       const key = p.name.toLowerCase();
       const pl = players[key];
 
-      pl.overall = Math.round(pl.overall + overallDeltas[key]);
-      pl[modeKey] = Math.round(pl[modeKey] + modeDeltas[key]);
-      pl.games += 1;
-      pl.kills += p.kills;
+      // Update both 'overall' and the specific gamemode ('sw' or 'bw')
+      [
+        { bucket: pl.stats.overall, delta: overallDeltas[key] },
+        { bucket: pl.stats[modeKey], delta: modeDeltas[key] }
+      ].forEach(({ bucket, delta }) => {
+        bucket.elo = Math.round(bucket.elo + delta);
+        bucket.games += 1;
+        bucket.kills += p.kills;
 
-      if (p.rank === 1) {
-        pl.wins += 1;
-        pl.streak += 1;
-        pl[modeStreakKey] += 1;
-      } else {
-        pl.streak = 0;
-        pl[modeStreakKey] = 0;
-      }
+        if (p.rank === 1) {
+          bucket.wins += 1;
+          bucket.streak += 1;
+        } else {
+          bucket.streak = 0;
+        }
+      });
     });
 
     history.unshift({ timestamp, mode: mode || "Match", matchStr });
@@ -218,21 +226,17 @@ function renderLeaderboard() {
 
   const sorted = [...allPlayers]
     .filter(p => p.name.toLowerCase().includes(search))
-    .sort((a, b) => b[currentMode] - a[currentMode]);
+    .sort((a, b) => b.stats[currentMode].elo - a.stats[currentMode].elo);
 
   tbody.innerHTML = sorted.map((p, idx) => {
     const rank = idx + 1;
-    const elo = p[currentMode];
+    const modeStats = p.stats[currentMode];
+    const elo = modeStats.elo;
     const tier = getTierBadge(elo);
-    const winRate = p.games > 0 ? Math.round((p.wins / p.games) * 100) : 0;
+    const winRate = modeStats.games > 0 ? Math.round((modeStats.wins / modeStats.games) * 100) : 0;
     const bannerClass = rank <= 3 ? `banner-${rank}` : "banner-default";
     const fileName = p.name.toUpperCase().trim().replace(/\s+/g, "_");
-
-    // Pick mode-specific streak
-    let activeStreak = p.streak;
-    if (currentMode === "sw") activeStreak = p.swStreak;
-    if (currentMode === "bw") activeStreak = p.bwStreak;
-    const streakDisplay = activeStreak >= 2 ? `🔥 ${activeStreak}` : activeStreak;
+    const streakDisplay = modeStats.streak >= 2 ? `🔥 ${modeStats.streak}` : modeStats.streak;
 
     return `
       <tr>
@@ -253,8 +257,8 @@ function renderLeaderboard() {
         </td>
         <td><span class="badge ${tier}">${tier}</span></td>
         <td class="elo-val">${elo}</td>
-        <td>${p.wins}</td>
-        <td>${p.kills}</td>
+        <td>${modeStats.wins}</td>
+        <td>${modeStats.kills}</td>
         <td class="streak-val">${streakDisplay}</td>
         <td>${winRate}%</td>
       </tr>

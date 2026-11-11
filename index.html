@@ -18,10 +18,15 @@
         <h1>MC EDU <span>PVP TIERS</span></h1>
         <p class="subtitle">Official SkyWars & BedWars Multiplayer ELO Rankings</p>
       </div>
-      <div class="controls">
-        <input type="text" id="searchInput" placeholder="Search player..." />
-        <button id="refreshBtn" title="Reload latest matches">↻ Refresh</button>
-      </div>
+		<div class="controls">
+			<label class="verify-toggle" title="Preview rankings including unverified matches">
+				<input type="checkbox" id="unverifiedToggle" />
+				<span>Include Unverified (<strong id="pendingCount">0</strong>)</span>
+			</label>
+			<input type="text" id="searchInput" placeholder="Search player..." aria-label="Search player" />
+			<button id="refreshBtn" title="Reload latest matches">↻ Refresh</button>
+		</div>
+
     </header>
 
     <nav class="tabs">

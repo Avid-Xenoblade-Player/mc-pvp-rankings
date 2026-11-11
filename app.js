@@ -13,6 +13,12 @@ let allPlayers = [];
 let recentMatches = [];
 let currentMode = "overall";
 
+// Looks for assets/playername.png first, and falls back to assets/default-skin.png
+function getAvatarHtml(playerName) {
+  const fileName = playerName.toLowerCase().trim().replace(/\s+/g, "_");
+  return `<img class="avatar-img" src="assets/${fileName}.png" onerror="this.onerror=null; this.src='assets/default-skin.png';" alt="${playerName}" />`;
+}
+
 // Parse CSV cleanly even when match strings contain commas inside quotes
 function parseCSV(text) {
   const rows = [];
@@ -183,14 +189,13 @@ function renderLeaderboard() {
     const tier = getTierBadge(elo);
     const winRate = p.games > 0 ? Math.round((p.wins / p.games) * 100) : 0;
     const rankClass = rank <= 3 ? `rank-${rank}` : "";
-    const initials = p.name.slice(0, 2).toUpperCase();
 
     return `
       <tr>
         <td class="rank-num ${rankClass}">#${rank}</td>
         <td>
           <div class="player-cell">
-            <div class="avatar">${initials}</div>
+            ${getAvatarHtml(p.name)}
             <span>${p.name}</span>
           </div>
         </td>
@@ -225,7 +230,6 @@ async function loadData() {
   statusEl.textContent = "Loading live rankings...";
 
   try {
-    // Cache-busting parameter ensures fresh Google Sheet data on refresh
     const url = `${SHEET_CSV_URL}&t=${Date.now()}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error("Could not fetch Google Sheet CSV.");
@@ -260,4 +264,3 @@ document.getElementById("searchInput").addEventListener("input", renderLeaderboa
 document.getElementById("refreshBtn").addEventListener("click", loadData);
 
 loadData();
-

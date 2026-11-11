@@ -61,7 +61,6 @@ body {
   border: 1px solid var(--border);
   color: var(--text-main);
   padding: 8px 14px;
-  border-radius: 8px;
   outline: none;
 }
 
@@ -70,7 +69,6 @@ body {
   border: 1px solid var(--border);
   color: var(--text-main);
   padding: 8px 14px;
-  border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
 }
@@ -90,7 +88,6 @@ body {
   border: 1px solid var(--border);
   color: var(--text-muted);
   padding: 10px 18px;
-  border-radius: 8px;
   cursor: pointer;
   font-weight: 700;
   font-size: 0.95rem;
@@ -113,7 +110,6 @@ body {
 .table-wrapper {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
   overflow-x: auto;
 }
 
@@ -164,7 +160,6 @@ tr:hover td {
 .avatar {
   width: 32px;
   height: 32px;
-  border-radius: 6px;
   background: #2b3142;
   display: flex;
   align-items: center;
@@ -178,7 +173,6 @@ tr:hover td {
 .badge {
   display: inline-block;
   padding: 4px 10px;
-  border-radius: 6px;
   font-size: 0.8rem;
   font-weight: 800;
 }
@@ -217,7 +211,6 @@ tr:hover td {
 .match-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
   padding: 12px 16px;
   display: flex;
   justify-content: space-between;

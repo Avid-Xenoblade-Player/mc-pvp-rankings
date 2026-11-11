@@ -9,21 +9,42 @@ const CONFIG = {
   KILL_BONUS: 2
 };
 
-let allPlayers = [];
-let recentMatches = [];
+let allPlayers =;
+let recentMatches =;
 let currentMode = "overall";
 
-// Looks for assets/PLAYERNAME.PNG first, and falls back to assets/default-skin.png
-function getAvatarHtml(playerName) {
-  const fileName = playerName.toUpperCase().trim().replace(/\s+/g, "_");
-  return `<img class="avatar-img" src="assets/${fileName}.PNG" onerror="this.onerror=null; this.src='assets/default-skin.png';" alt="${playerName}" />`;
+// Automatically removes white/near-white background pixels from any PNG image
+function makeTransparent(imgEl) {
+  if (imgEl.dataset.cleaned) return;
+  imgEl.dataset.cleaned = "true";
+
+  try {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = imgEl.naturalWidth || 64;
+    canvas.height = imgEl.naturalHeight || 64;
+
+    ctx.drawImage(imgEl, 0, 0);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imgData.data;
+
+    // Turn pure white and near-white pixels (R,G,B > 240) completely transparent
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240) {
+        data[i + 3] = 0;
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    imgEl.src = canvas.toDataURL("image/png");
+  } catch (e) {
+    // Fallback safely if browser blocks pixel read
+  }
 }
 
-
-// Parse CSV cleanly even when match strings contain commas inside quotes
 function parseCSV(text) {
-  const rows = [];
-  let row = [];
+  const rows =;
+  let row =;
   let cur = "";
   let inQuotes = false;
 
@@ -43,7 +64,7 @@ function parseCSV(text) {
       if (ch === "\r" && next === "\n") i++;
       row.push(cur);
       if (row.some(cell => cell.trim() !== "")) rows.push(row);
-      row = [];
+      row =;
       cur = "";
     } else {
       cur += ch;
@@ -58,7 +79,7 @@ function parseCSV(text) {
 
 function parseMatchString(str) {
   const rankGroups = str.split(",");
-  const results = [];
+  const results =;
 
   rankGroups.forEach((group, rankIndex) => {
     const tiedPlayers = group.split("=");
@@ -67,8 +88,8 @@ function parseMatchString(str) {
       if (!clean) return;
 
       const parts = clean.split(":");
-      const name = parts[0].trim();
-      const kills = parts.length > 1 ? (parseInt(parts[1].trim(), 10) || 0) : 0;
+      const name = parts.trim();
+      const kills = parts.length > 1 ? (parseInt(parts.trim(), 10) || 0) : 0;
 
       if (name) {
         results.push({
@@ -129,13 +150,13 @@ function getTierBadge(elo) {
 
 function processMatches(rows) {
   const players = {};
-  const history = [];
+  const history =;
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    const timestamp = row[0] || "";
-    const mode = (row[1] || "").trim();
-    const matchStr = (row[2] || "").trim();
+    const timestamp = row || "";
+    const mode = (row || "").trim();
+    const matchStr = (row || "").trim();
 
     if (!matchStr) continue;
     const lobby = parseMatchString(matchStr);
@@ -151,22 +172,37 @@ function processMatches(rows) {
           bw: CONFIG.STARTING_ELO,
           wins: 0,
           games: 0,
-          kills: 0
+          kills: 0,
+          streak: 0,
+          swStreak: 0,
+          bwStreak: 0
         };
       }
     });
 
     const overallDeltas = computeMultiplayerElo(lobby, players, "overall");
-    const modeKey = mode.toLowerCase().includes("bed") ? "bw" : "sw";
+    const isBedwars = mode.toLowerCase().includes("bed");
+    const modeKey = isBedwars ? "bw" : "sw";
+    const modeStreakKey = isBedwars ? "bwStreak" : "swStreak";
     const modeDeltas = computeMultiplayerElo(lobby, players, modeKey);
 
     lobby.forEach(p => {
       const key = p.name.toLowerCase();
-      players[key].overall = Math.round(players[key].overall + overallDeltas[key]);
-      players[key][modeKey] = Math.round(players[key][modeKey] + modeDeltas[key]);
-      players[key].games += 1;
-      players[key].kills += p.kills;
-      if (p.rank === 1) players[key].wins += 1;
+      const pl = players[key];
+
+      pl.overall = Math.round(pl.overall + overallDeltas[key]);
+      pl[modeKey] = Math.round(pl[modeKey] + modeDeltas[key]);
+      pl.games += 1;
+      pl.kills += p.kills;
+
+      if (p.rank === 1) {
+        pl.wins += 1;
+        pl.streak += 1;
+        pl[modeStreakKey] += 1;
+      } else {
+        pl.streak = 0;
+        pl[modeStreakKey] = 0;
+      }
     });
 
     history.unshift({ timestamp, mode: mode || "Match", matchStr });
@@ -189,21 +225,37 @@ function renderLeaderboard() {
     const elo = p[currentMode];
     const tier = getTierBadge(elo);
     const winRate = p.games > 0 ? Math.round((p.wins / p.games) * 100) : 0;
-    const rankClass = rank <= 3 ? `rank-${rank}` : "";
+    const bannerClass = rank <= 3 ? `banner-${rank}` : "banner-default";
+    const fileName = p.name.toUpperCase().trim().replace(/\s+/g, "_");
+
+    // Pick mode-specific streak
+    let activeStreak = p.streak;
+    if (currentMode === "sw") activeStreak = p.swStreak;
+    if (currentMode === "bw") activeStreak = p.bwStreak;
+    const streakDisplay = activeStreak >= 2 ? `🔥 ${activeStreak}` : activeStreak;
 
     return `
       <tr>
-        <td class="rank-num ${rankClass}">#${rank}</td>
-        <td>
+        <td class="col-player">
           <div class="player-cell">
-            ${getAvatarHtml(p.name)}
-            <span>${p.name}</span>
+            <div class="rank-banner ${bannerClass}">
+              <span class="banner-num">${rank}</span>
+              <img 
+                class="bust-img" 
+                src="assets/${fileName}.PNG" 
+                onload="makeTransparent(this)"
+                onerror="this.onerror=null; this.src='assets/default-skin.png';" 
+                alt="${p.name}" 
+              />
+            </div>
+            <span class="player-name">${p.name}</span>
           </div>
         </td>
         <td><span class="badge ${tier}">${tier}</span></td>
         <td class="elo-val">${elo}</td>
         <td>${p.wins}</td>
         <td>${p.kills}</td>
+        <td class="streak-val">${streakDisplay}</td>
         <td>${winRate}%</td>
       </tr>
     `;
@@ -265,3 +317,4 @@ document.getElementById("searchInput").addEventListener("input", renderLeaderboa
 document.getElementById("refreshBtn").addEventListener("click", loadData);
 
 loadData();
+

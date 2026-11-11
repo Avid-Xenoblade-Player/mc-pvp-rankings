@@ -18,11 +18,37 @@ const GAMEMODES = {
 
 let allPlayers = [];
 let allMatches = [];
+let rawRows = [];
+let pendingCount = 0;
+let includeUnverified = false;
 let currentMode = "overall";
 
 // Automatically removes white/near-white background pixels from any PNG image
 function makeTransparent(imgEl) {
-  return;
+  if (imgEl.dataset.cleaned) return;
+  imgEl.dataset.cleaned = "true";
+
+  try {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = imgEl.naturalWidth || 64;
+    canvas.height = imgEl.naturalHeight || 64;
+
+    ctx.drawImage(imgEl, 0, 0);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imgData.data;
+
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240) {
+        data[i + 3] = 0;
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    imgEl.src = canvas.toDataURL("image/png");
+  } catch (e) {
+    // Fallback safely if browser blocks pixel read
+  }
 }
 
 function parseCSV(text) {
@@ -92,7 +118,7 @@ function detectModeKey(modeText) {
   for (const [key, keyword] of Object.entries(GAMEMODES)) {
     if (lower.includes(keyword)) return key;
   }
-  return "sw"; // Default fallback if a row doesn't match any keyword
+  return "sw";
 }
 
 function computeMultiplayerElo(lobby, players, modeKey) {
@@ -152,20 +178,23 @@ function createModeStats() {
 function processMatches(rows) {
   const players = {};
   const history = [];
+  let unverifiedMatches = 0;
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     const timestamp = row[0] || "";
     const mode = (row[1] || "").trim();
     const matchStr = (row[2] || "").trim();
-    const verified = (row[4] || "").trim().toUpperCase();
-
-    // Skip rows that are not ticked as TRUE in Column E
-    if (verified !== "TRUE") continue;
+    const isVerified = (row[4] || "").trim().toUpperCase() === "TRUE";
 
     if (!matchStr) continue;
     const lobby = parseMatchString(matchStr);
     if (lobby.length < 2) continue;
+
+    if (!isVerified) {
+      unverifiedMatches++;
+      if (!includeUnverified) continue;
+    }
 
     const modeKey = detectModeKey(mode);
 
@@ -208,14 +237,18 @@ function processMatches(rows) {
       timestamp,
       mode: mode || "Match",
       modeKey,
-      matchStr
+      matchStr,
+      isVerified
     });
   }
 
+  pendingCount = unverifiedMatches;
   allPlayers = Object.values(players);
   allMatches = history;
-}
 
+  const pendingEl = document.getElementById("pendingCount");
+  if (pendingEl) pendingEl.textContent = pendingCount;
+}
 
 function renderLeaderboard() {
   const tbody = document.getElementById("leaderboardBody");
@@ -281,9 +314,9 @@ function openPlayerModal(playerName) {
   const overallWinRate = overall.games > 0 ? Math.round((overall.wins / overall.games) * 100) : 0;
 
   const modeLabels = [
-    { key: "sw", label: "SkyWars" },
-    { key: "bw", label: "BedWars" },
-    { key: "arena", label: "PvP Arena" }
+    { key: "sw", label: "☁️ SkyWars" },
+    { key: "bw", label: "🛏️ BedWars" },
+    { key: "arena", label: "⚔️ PvP Arena" }
   ];
 
   const modeCardsHtml = modeLabels.map(m => {
@@ -313,7 +346,10 @@ function openPlayerModal(playerName) {
   const historyHtml = playerMatches.length
     ? playerMatches.map(m => `
         <div class="match-card" style="margin-bottom: 6px; padding: 8px 12px; font-size: 0.85rem;">
-          <div><span class="match-mode">[${m.mode}]</span> ${m.matchStr}</div>
+          <div>
+            <span class="match-mode">[${m.mode}]</span> ${m.matchStr}
+            ${!m.isVerified ? `<span class="badge-pending">PENDING</span>` : ""}
+          </div>
           <div style="color: var(--text-muted); font-size: 0.75rem;">${m.timestamp}</div>
         </div>
       `).join("")
@@ -369,7 +405,10 @@ function renderRecentMatches() {
 
   container.innerHTML = visibleMatches.map(m => `
     <div class="match-card">
-      <div><span class="match-mode">[${m.mode}]</span> ${m.matchStr}</div>
+      <div>
+        <span class="match-mode">[${m.mode}]</span> ${m.matchStr}
+        ${!m.isVerified ? `<span class="badge-pending">PENDING</span>` : ""}
+      </div>
       <div style="color: var(--text-muted); font-size: 0.8rem;">${m.timestamp}</div>
     </div>
   `).join("");
@@ -386,12 +425,14 @@ async function loadData() {
     if (!res.ok) throw new Error("Could not fetch Google Sheet CSV.");
 
     const csvText = await res.text();
-    const rows = parseCSV(csvText);
-    processMatches(rows);
+    rawRows = parseCSV(csvText);
+    processMatches(rawRows);
 
     statusEl.style.display = allPlayers.length ? "none" : "block";
     if (!allPlayers.length) {
-      statusEl.textContent = "Connected! Submit your first match on the Google Form to appear here.";
+      statusEl.textContent = pendingCount > 0
+        ? `${pendingCount} match(es) waiting for admin verification. Tick "Include Unverified" to preview.`
+        : "Connected! Submit your first match on the Google Form to appear here.";
     }
 
     renderLeaderboard();
@@ -414,6 +455,21 @@ document.querySelectorAll(".tab").forEach(btn => {
 
 document.getElementById("searchInput").addEventListener("input", renderLeaderboard);
 document.getElementById("refreshBtn").addEventListener("click", loadData);
+
+document.getElementById("unverifiedToggle").addEventListener("change", e => {
+  includeUnverified = e.target.checked;
+  processMatches(rawRows);
+
+  const statusEl = document.getElementById("statusMsg");
+  statusEl.style.display = allPlayers.length ? "none" : "block";
+  if (!allPlayers.length && pendingCount > 0) {
+    statusEl.textContent = `${pendingCount} match(es) waiting for admin verification. Tick "Include Unverified" to preview.`;
+  }
+
+  renderLeaderboard();
+  renderRecentMatches();
+});
+
 document.getElementById("closeModalBtn").addEventListener("click", closePlayerModal);
 document.getElementById("playerModal").addEventListener("click", e => {
   if (e.target.id === "playerModal") closePlayerModal();

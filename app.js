@@ -158,6 +158,10 @@ function processMatches(rows) {
     const timestamp = row[0] || "";
     const mode = (row[1] || "").trim();
     const matchStr = (row[2] || "").trim();
+    const verified = (row[4] || "").trim().toUpperCase();
+
+    // Skip rows that are not ticked as TRUE in Column E
+    if (verified !== "TRUE") continue;
 
     if (!matchStr) continue;
     const lobby = parseMatchString(matchStr);
@@ -211,6 +215,7 @@ function processMatches(rows) {
   allPlayers = Object.values(players);
   allMatches = history;
 }
+
 
 function renderLeaderboard() {
   const tbody = document.getElementById("leaderboardBody");

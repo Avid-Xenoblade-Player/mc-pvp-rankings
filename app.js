@@ -9,8 +9,8 @@ const CONFIG = {
   KILL_BONUS: 2
 };
 
-let allPlayers =;
-let recentMatches =;
+let allPlayers = [];
+let recentMatches = [];
 let currentMode = "overall";
 
 // Automatically removes white/near-white background pixels from any PNG image
@@ -43,8 +43,8 @@ function makeTransparent(imgEl) {
 }
 
 function parseCSV(text) {
-  const rows =;
-  let row =;
+  const rows = [];
+  let row = [];
   let cur = "";
   let inQuotes = false;
 
@@ -64,7 +64,7 @@ function parseCSV(text) {
       if (ch === "\r" && next === "\n") i++;
       row.push(cur);
       if (row.some(cell => cell.trim() !== "")) rows.push(row);
-      row =;
+      row = [];
       cur = "";
     } else {
       cur += ch;
@@ -79,7 +79,7 @@ function parseCSV(text) {
 
 function parseMatchString(str) {
   const rankGroups = str.split(",");
-  const results =;
+  const results = [];
 
   rankGroups.forEach((group, rankIndex) => {
     const tiedPlayers = group.split("=");
@@ -88,8 +88,8 @@ function parseMatchString(str) {
       if (!clean) return;
 
       const parts = clean.split(":");
-      const name = parts.trim();
-      const kills = parts.length > 1 ? (parseInt(parts.trim(), 10) || 0) : 0;
+      const name = parts[0].trim();
+      const kills = parts.length > 1 ? (parseInt(parts[1].trim(), 10) || 0) : 0;
 
       if (name) {
         results.push({
@@ -150,13 +150,13 @@ function getTierBadge(elo) {
 
 function processMatches(rows) {
   const players = {};
-  const history =;
+  const history = [];
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    const timestamp = row || "";
-    const mode = (row || "").trim();
-    const matchStr = (row || "").trim();
+    const timestamp = row[0] || "";
+    const mode = (row[1] || "").trim();
+    const matchStr = (row[2] || "").trim();
 
     if (!matchStr) continue;
     const lobby = parseMatchString(matchStr);
@@ -317,4 +317,3 @@ document.getElementById("searchInput").addEventListener("input", renderLeaderboa
 document.getElementById("refreshBtn").addEventListener("click", loadData);
 
 loadData();
-

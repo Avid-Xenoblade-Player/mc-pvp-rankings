@@ -13,11 +13,12 @@ let allPlayers = [];
 let recentMatches = [];
 let currentMode = "overall";
 
-// Looks for assets/playername.png first, and falls back to assets/default-skin.png
+// Looks for assets/PLAYERNAME.PNG first, and falls back to assets/default-skin.png
 function getAvatarHtml(playerName) {
-  const fileName = playerName.toLowerCase().trim().replace(/\s+/g, "_");
-  return `<img class="avatar-img" src="assets/${fileName}.png" onerror="this.onerror=null; this.src='assets/default-skin.png';" alt="${playerName}" />`;
+  const fileName = playerName.toUpperCase().trim().replace(/\s+/g, "_");
+  return `<img class="avatar-img" src="assets/${fileName}.PNG" onerror="this.onerror=null; this.src='assets/default-skin.png';" alt="${playerName}" />`;
 }
+
 
 // Parse CSV cleanly even when match strings contain commas inside quotes
 function parseCSV(text) {

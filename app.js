@@ -261,7 +261,7 @@ function renderLeaderboard() {
     const streakDisplay = modeStats.streak >= 2 ? `🔥 ${modeStats.streak}` : modeStats.streak;
 
     return `
-      <tr>
+      <tr onclick="openPlayerModal('${p.name.replace(/'/g, "\\'")}')">
         <td class="col-player">
           <div class="player-cell">
             <div class="rank-banner ${bannerClass}">
@@ -286,6 +286,91 @@ function renderLeaderboard() {
       </tr>
     `;
   }).join("");
+}
+
+function openPlayerModal(playerName) {
+  const player = allPlayers.find(p => p.name.toLowerCase() === playerName.toLowerCase());
+  if (!player) return;
+
+  const modal = document.getElementById("playerModal");
+  const content = document.getElementById("modalContent");
+  const fileName = player.name.toUpperCase().trim().replace(/\s+/g, "_");
+  const overall = player.stats.overall;
+  const overallTier = getTierBadge(overall.elo);
+  const overallWinRate = overall.games > 0 ? Math.round((overall.wins / overall.games) * 100) : 0;
+
+  const modeLabels = [
+    { key: "sw", label: "☁️ SkyWars" },
+    { key: "bw", label: "🛏️ BedWars" },
+    { key: "arena", label: "⚔️ PvP Arena" }
+  ];
+
+  const modeCardsHtml = modeLabels.map(m => {
+    const s = player.stats[m.key];
+    const tier = getTierBadge(s.elo);
+    const wr = s.games > 0 ? Math.round((s.wins / s.games) * 100) : 0;
+
+    return `
+      <div class="mode-box">
+        <div class="mode-box-title">${m.label}</div>
+        <div class="mode-box-row">
+          <span class="badge ${tier}">${tier}</span>
+          <span class="elo-val">${s.elo} ELO</span>
+        </div>
+        <div class="mode-box-sub">
+          ${s.wins}W / ${s.games}G (${wr}%)<br/>
+          ${s.kills} Kills • Streak: ${s.streak}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  const playerMatches = allMatches
+    .filter(m => m.matchStr.toLowerCase().includes(player.name.toLowerCase()))
+    .slice(0, 5);
+
+  const historyHtml = playerMatches.length
+    ? playerMatches.map(m => `
+        <div class="match-card" style="margin-bottom: 6px; padding: 8px 12px; font-size: 0.85rem;">
+          <div><span class="match-mode">[${m.mode}]</span> ${m.matchStr}</div>
+          <div style="color: var(--text-muted); font-size: 0.75rem;">${m.timestamp}</div>
+        </div>
+      `).join("")
+    : `<div style="color: var(--text-muted); font-size: 0.85rem;">No recent matches found.</div>`;
+
+  content.innerHTML = `
+    <div class="profile-header">
+      <img
+        class="profile-avatar"
+        src="assets/${fileName}.PNG"
+        onload="makeTransparent(this)"
+        onerror="this.onerror=null; this.src='assets/default-skin.png';"
+        alt="${player.name}"
+      />
+      <div class="profile-title">
+        <h2>${player.name}</h2>
+        <span class="badge ${overallTier}">Overall ${overallTier}</span>
+        <span style="margin-left: 8px; font-weight: 700;">${overall.elo} ELO</span>
+        <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 6px;">
+          ${overall.wins} Wins • ${overall.kills} Kills • ${overallWinRate}% Win Rate
+        </div>
+      </div>
+    </div>
+
+    <div class="mode-grid">${modeCardsHtml}</div>
+
+    <div class="profile-history-title">Last 5 Matches</div>
+    <div>${historyHtml}</div>
+  `;
+
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closePlayerModal() {
+  const modal = document.getElementById("playerModal");
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
 }
 
 function renderRecentMatches() {
@@ -348,5 +433,12 @@ document.querySelectorAll(".tab").forEach(btn => {
 
 document.getElementById("searchInput").addEventListener("input", renderLeaderboard);
 document.getElementById("refreshBtn").addEventListener("click", loadData);
+document.getElementById("closeModalBtn").addEventListener("click", closePlayerModal);
+document.getElementById("playerModal").addEventListener("click", e => {
+  if (e.target.id === "playerModal") closePlayerModal();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closePlayerModal();
+});
 
 loadData();

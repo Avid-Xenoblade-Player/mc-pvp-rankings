@@ -1,1 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MC Edu PvP Rankings</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://googleapis.com" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="title-block">
+        <h1>MC EDU <span>PVP TIERS</span></h1>
+        <p class="subtitle">Official SkyWars & BedWars Multiplayer ELO Rankings</p>
+      </div>
+      <div class="controls">
+        <input type="text" id="searchInput" placeholder="Search player..." />
+        <button id="refreshBtn" title="Reload latest matches">↻ Refresh</button>
+      </div>
+    </header>
 
+    <nav class="tabs">
+      <button class="tab active" data-mode="overall">🏆 Overall</button>
+      <button class="tab" data-mode="sw">☁️ SkyWars</button>
+      <button class="tab" data-mode="bw">🛏️ BedWars</button>
+    </nav>
+
+    <main>
+      <div id="statusMsg" class="status-msg">Loading live rankings...</div>
+      
+      <div class="table-wrapper">
+        <table id="leaderboardTable">
+          <thead>
+            <tr>
+              <th class="col-rank">#</th>
+              <th class="col-player">Player</th>
+              <th class="col-tier">Tier</th>
+              <th class="col-elo">ELO</th>
+              <th class="col-stat">Wins</th>
+              <th class="col-stat">Kills</th>
+              <th class="col-stat">Win %</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboardBody"></tbody>
+        </table>
+      </div>
+
+      <section class="recent-section">
+        <h2>Recent Matches</h2>
+        <div id="recentMatches" class="recent-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

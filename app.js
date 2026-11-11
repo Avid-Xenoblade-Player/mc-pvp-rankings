@@ -9,8 +9,15 @@ const CONFIG = {
   KILL_BONUS: 2
 };
 
+// Map each tab's data-mode key to the keyword in your Google Sheet's Gamemode column
+const GAMEMODES = {
+  bw: "bed",
+  sw: "sky",
+  arena: "arena"
+};
+
 let allPlayers = [];
-let recentMatches = [];
+let allMatches = [];
 let currentMode = "overall";
 
 // Automatically removes white/near-white background pixels from any PNG image
@@ -104,6 +111,14 @@ function parseMatchString(str) {
   return results;
 }
 
+function detectModeKey(modeText) {
+  const lower = modeText.toLowerCase();
+  for (const [key, keyword] of Object.entries(GAMEMODES)) {
+    if (lower.includes(keyword)) return key;
+  }
+  return "sw"; // Default fallback if a row doesn't match any keyword
+}
+
 function computeMultiplayerElo(lobby, players, modeKey) {
   const n = lobby.length;
   const deltas = {};
@@ -172,30 +187,26 @@ function processMatches(rows) {
     const lobby = parseMatchString(matchStr);
     if (lobby.length < 2) continue;
 
+    const modeKey = detectModeKey(mode);
+
     lobby.forEach(p => {
       const key = p.name.toLowerCase();
       if (!players[key]) {
-        players[key] = {
-          name: p.name,
-          stats: {
-            overall: createModeStats(),
-            sw: createModeStats(),
-            bw: createModeStats()
-          }
-        };
+        const stats = { overall: createModeStats() };
+        Object.keys(GAMEMODES).forEach(k => {
+          stats[k] = createModeStats();
+        });
+        players[key] = { name: p.name, stats };
       }
     });
 
     const overallDeltas = computeMultiplayerElo(lobby, players, "overall");
-    const isBedwars = mode.toLowerCase().includes("bed");
-    const modeKey = isBedwars ? "bw" : "sw";
     const modeDeltas = computeMultiplayerElo(lobby, players, modeKey);
 
     lobby.forEach(p => {
       const key = p.name.toLowerCase();
       const pl = players[key];
 
-      // Update both 'overall' and the specific gamemode ('sw' or 'bw')
       [
         { bucket: pl.stats.overall, delta: overallDeltas[key] },
         { bucket: pl.stats[modeKey], delta: modeDeltas[key] }
@@ -213,11 +224,16 @@ function processMatches(rows) {
       });
     });
 
-    history.unshift({ timestamp, mode: mode || "Match", matchStr });
+    history.unshift({
+      timestamp,
+      mode: mode || "Match",
+      modeKey,
+      matchStr
+    });
   }
 
   allPlayers = Object.values(players);
-  recentMatches = history.slice(0, 10);
+  allMatches = history;
 }
 
 function renderLeaderboard() {
@@ -225,8 +241,14 @@ function renderLeaderboard() {
   const search = document.getElementById("searchInput").value.toLowerCase().trim();
 
   const sorted = [...allPlayers]
+    .filter(p => p.stats[currentMode].games > 0)
     .filter(p => p.name.toLowerCase().includes(search))
     .sort((a, b) => b.stats[currentMode].elo - a.stats[currentMode].elo);
+
+  if (!sorted.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">No players found for this mode yet.</td></tr>`;
+    return;
+  }
 
   tbody.innerHTML = sorted.map((p, idx) => {
     const rank = idx + 1;
@@ -268,12 +290,18 @@ function renderLeaderboard() {
 
 function renderRecentMatches() {
   const container = document.getElementById("recentMatches");
-  if (!recentMatches.length) {
-    container.innerHTML = `<div class="match-card">No matches logged yet!</div>`;
+  const filtered = currentMode === "overall"
+    ? allMatches
+    : allMatches.filter(m => m.modeKey === currentMode);
+
+  const visibleMatches = filtered.slice(0, 10);
+
+  if (!visibleMatches.length) {
+    container.innerHTML = `<div class="match-card">No matches logged for this mode yet!</div>`;
     return;
   }
 
-  container.innerHTML = recentMatches.map(m => `
+  container.innerHTML = visibleMatches.map(m => `
     <div class="match-card">
       <div><span class="match-mode">[${m.mode}]</span> ${m.matchStr}</div>
       <div style="color: var(--text-muted); font-size: 0.8rem;">${m.timestamp}</div>
@@ -314,6 +342,7 @@ document.querySelectorAll(".tab").forEach(btn => {
     btn.classList.add("active");
     currentMode = btn.dataset.mode;
     renderLeaderboard();
+    renderRecentMatches();
   });
 });
 

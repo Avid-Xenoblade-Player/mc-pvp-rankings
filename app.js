@@ -25,30 +25,7 @@ let currentMode = "overall";
 
 // Automatically removes white/near-white background pixels from any PNG image
 function makeTransparent(imgEl) {
-  if (imgEl.dataset.cleaned) return;
-  imgEl.dataset.cleaned = "true";
-
-  try {
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = imgEl.naturalWidth || 64;
-    canvas.height = imgEl.naturalHeight || 64;
-
-    ctx.drawImage(imgEl, 0, 0);
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imgData.data;
-
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240) {
-        data[i + 3] = 0;
-      }
-    }
-
-    ctx.putImageData(imgData, 0, 0);
-    imgEl.src = canvas.toDataURL("image/png");
-  } catch (e) {
-    // Fallback safely if browser blocks pixel read
-  }
+  return;
 }
 
 function parseCSV(text) {
